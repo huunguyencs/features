@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-surface-base text-text-primary font-sans;
+    margin: 0;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .tool-card {
+    @apply bg-surface-raised rounded-xl p-6 shadow-lg;
+  }
+
+  .tool-input {
+    @apply w-full bg-surface-overlay text-text-primary border border-text-muted rounded-lg px-3 py-2
+           placeholder-text-muted focus:outline-none focus:border-accent-primary focus:ring-1 focus:ring-accent-primary
+           transition-colors;
+  }
+
+  .tool-textarea {
+    @apply tool-input resize-y font-mono text-sm leading-relaxed;
+    min-height: 8rem;
+  }
+
+  .output-block {
+    @apply bg-surface-base border border-text-muted rounded-lg p-4 font-mono text-sm text-text-primary whitespace-pre-wrap break-all;
+  }
+
+  .btn-primary {
+    @apply bg-accent-primary hover:bg-accent-hover text-white font-medium px-4 py-2 rounded-lg
+           transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-overlay hover:bg-text-muted text-text-primary font-medium px-4 py-2 rounded-lg
+           transition-colors;
+  }
+
+  .tool-label {
+    @apply block text-sm font-medium text-text-secondary mb-1;
+  }
+
+  .badge-valid {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/50 text-green-400;
+  }
+
+  .badge-invalid {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/50 text-red-400;
+  }
+}
