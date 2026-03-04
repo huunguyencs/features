@@ -1,28 +1,9 @@
-import { useState, useCallback } from "react";
-
-const CHARSETS = {
-  upper: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-  lower: "abcdefghijklmnopqrstuvwxyz",
-  numbers: "0123456789",
-  symbols: "!@#$%^&*()-_=+[]{}|;:,.<>?",
-};
-
-function generateToken(length, charsets) {
-  const pool = Object.entries(charsets)
-    .filter(([, enabled]) => enabled)
-    .map(([key]) => CHARSETS[key])
-    .join("");
-
-  if (!pool) return "";
-
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) => pool[byte % pool.length]).join("");
-}
+import { useState, useCallback, type ChangeEvent } from "react";
+import { CHARSETS, generateToken, type CharsetOptions, type CharsetKey } from "../utils/token";
 
 export default function TokenGenerator() {
   const [length, setLength] = useState(32);
-  const [charsets, setCharsets] = useState({
+  const [charsets, setCharsets] = useState<CharsetOptions>({
     upper: true,
     lower: true,
     numbers: true,
@@ -44,7 +25,7 @@ export default function TokenGenerator() {
     setToken(generateToken(length, charsets));
   }, [length, charsets]);
 
-  function toggleCharset(key) {
+  function toggleCharset(key: CharsetKey) {
     setCharsets((prev) => {
       const next = { ...prev, [key]: !prev[key] };
       setToken(generateToken(length, next));
@@ -52,7 +33,7 @@ export default function TokenGenerator() {
     });
   }
 
-  function onLengthChange(e) {
+  function onLengthChange(e: ChangeEvent<HTMLInputElement>) {
     const l = Number(e.target.value);
     setLength(l);
     setToken(generateToken(l, charsets));
@@ -113,7 +94,7 @@ export default function TokenGenerator() {
         <div>
           <label className="tool-label">Character Sets</label>
           <div className="flex flex-wrap gap-3 mt-1">
-            {Object.keys(CHARSETS).map((key) => (
+            {(Object.keys(CHARSETS) as CharsetKey[]).map((key) => (
               <label
                 key={key}
                 className="flex items-center gap-2 cursor-pointer select-none"

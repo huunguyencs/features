@@ -1,35 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
+import { hashBuffer, textToBuffer, type HashResult } from "../utils/hash";
 
-async function hashBuffer(buffer) {
-  const [sha1, sha256] = await Promise.all([
-    crypto.subtle.digest("SHA-1", buffer),
-    crypto.subtle.digest("SHA-256", buffer),
-  ]);
-  return {
-    sha1: bufToHex(sha1),
-    sha256: bufToHex(sha256),
-  };
-}
-
-function bufToHex(buf) {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function textToBuffer(str) {
-  return new TextEncoder().encode(str).buffer;
+interface FileInfo {
+  name: string;
+  size: number;
 }
 
 export default function HashGenerator() {
-  const [tab, setTab] = useState("text");
+  const [tab, setTab] = useState<"text" | "file">("text");
   const [text, setText] = useState("");
-  const [hashes, setHashes] = useState(null);
+  const [hashes, setHashes] = useState<HashResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [fileInfo, setFileInfo] = useState(null);
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [secure, setSecure] = useState(true);
-  const fileRef = useRef(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setSecure(window.isSecureContext);
@@ -53,7 +38,7 @@ export default function HashGenerator() {
     };
   }, [text, tab]);
 
-  async function handleFile(e) {
+  async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileInfo({ name: file.name, size: file.size });
@@ -71,8 +56,8 @@ export default function HashGenerator() {
     }
   }
 
-  function copy(text) {
-    navigator.clipboard.writeText(text);
+  function copy(value: string) {
+    navigator.clipboard.writeText(value);
   }
 
   if (!secure) {
@@ -104,7 +89,7 @@ export default function HashGenerator() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 bg-surface-raised rounded-lg p-1 w-fit">
-        {["text", "file"].map((t) => (
+        {(["text", "file"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {
@@ -186,10 +171,12 @@ export default function HashGenerator() {
 
         {hashes && (
           <div className="space-y-3">
-            {[
-              ["SHA-1", hashes.sha1],
-              ["SHA-256", hashes.sha256],
-            ].map(([algo, hash]) => (
+            {(
+              [
+                ["SHA-1", hashes.sha1],
+                ["SHA-256", hashes.sha256],
+              ] as [string, string][]
+            ).map(([algo, hash]) => (
               <div key={algo}>
                 <div className="flex items-center justify-between mb-1">
                   <label className="tool-label mb-0">{algo}</label>

@@ -1,36 +1,27 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type ChangeEvent } from "react";
+import { encodeText, decodeText } from "../utils/base64";
 
-function encodeText(str) {
-  try {
-    return btoa(unescape(encodeURIComponent(str)));
-  } catch (e) {
-    throw new Error("Encoding failed: " + e.message);
-  }
-}
-
-function decodeText(str) {
-  try {
-    return decodeURIComponent(escape(atob(str.trim())));
-  } catch (e) {
-    throw new Error("Decoding failed — invalid Base64 input. " + e.message);
-  }
+interface FileInfo {
+  name: string;
+  size: number;
+  type: string;
 }
 
 export default function Base64Tool() {
-  const [tab, setTab] = useState("text"); // 'text' | 'file'
+  const [tab, setTab] = useState<"text" | "file">("text");
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
-  const [fileInfo, setFileInfo] = useState(null);
+  const [fileInfo, setFileInfo] = useState<FileInfo | null>(null);
   const [fileB64, setFileB64] = useState("");
-  const fileRef = useRef(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function encode() {
     setError("");
     try {
       setOutput(encodeText(input));
     } catch (e) {
-      setError(e.message);
+      setError((e as Error).message);
       setOutput("");
     }
   }
@@ -40,19 +31,19 @@ export default function Base64Tool() {
     try {
       setOutput(decodeText(input));
     } catch (e) {
-      setError(e.message);
+      setError((e as Error).message);
       setOutput("");
     }
   }
 
-  function handleFile(e) {
+  function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileInfo({ name: file.name, size: file.size, type: file.type });
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result;
-      const b64 = dataUrl.split(",")[1];
+      const dataUrl = reader.result as string;
+      const b64 = dataUrl.split(",")[1] ?? "";
       setFileB64(b64);
       setError("");
     };
@@ -91,7 +82,7 @@ export default function Base64Tool() {
 
       {/* Tab switcher */}
       <div className="flex gap-1 bg-surface-raised rounded-lg p-1 w-fit">
-        {["text", "file"].map((t) => (
+        {(["text", "file"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {

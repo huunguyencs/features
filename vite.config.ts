@@ -4,6 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   base: "/features/",
+  appType: "mpa",
   plugins: [
     react(),
     VitePWA({
@@ -11,6 +12,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         navigateFallback: "index.html",
+        navigateFallbackAllowlist: [/^\/features\/?$/],
       },
       manifest: {
         name: "Dev Tools",

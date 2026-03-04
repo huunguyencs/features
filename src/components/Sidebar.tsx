@@ -1,6 +1,13 @@
+import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
-const tools = [
+interface Tool {
+  path: string;
+  label: string;
+  icon: ReactNode;
+}
+
+const tools: Tool[] = [
   {
     path: "/url-shortener",
     label: "URL Shortener",
@@ -167,7 +174,12 @@ const tools = [
   },
 ];
 
-export default function Sidebar({ collapsed, onToggle }) {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={`flex flex-col bg-surface-raised border-r border-surface-overlay transition-all duration-300 shrink-0 ${

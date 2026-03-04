@@ -1,23 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-
-function debounce(fn, ms) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
-  };
-}
+import { useState, useEffect, useMemo } from "react";
+import { debounce } from "../utils/debounce";
 
 export default function JsonFormatter() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [error, setError] = useState("");
-  const [status, setStatus] = useState(null); // 'valid' | 'invalid' | null
+  const [status, setStatus] = useState<"valid" | "invalid" | null>(null);
   const [indent, setIndent] = useState(2);
   const [minify, setMinify] = useState(false);
 
-  const validate = useCallback(
-    debounce((text, spaces, mini) => {
+  const validate = useMemo(
+    () => debounce((text: string, spaces: number, mini: boolean) => {
       if (!text.trim()) {
         setStatus(null);
         setError("");
@@ -25,7 +18,7 @@ export default function JsonFormatter() {
         return;
       }
       try {
-        const parsed = JSON.parse(text);
+        const parsed: unknown = JSON.parse(text);
         const formatted = mini
           ? JSON.stringify(parsed)
           : JSON.stringify(parsed, null, spaces);
@@ -34,7 +27,7 @@ export default function JsonFormatter() {
         setStatus("valid");
       } catch (e) {
         setStatus("invalid");
-        setError(e.message);
+        setError((e as Error).message);
         setOutput("");
       }
     }, 300),

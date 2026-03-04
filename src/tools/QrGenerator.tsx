@@ -1,15 +1,17 @@
 import { useState, useRef } from "react";
 import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
 
-const EC_LEVELS = ["L", "M", "Q", "H"];
+type EcLevel = "L" | "M" | "Q" | "H";
+
+const EC_LEVELS: EcLevel[] = ["L", "M", "Q", "H"];
 
 export default function QrGenerator() {
   const [value, setValue] = useState("https://example.com");
   const [size, setSize] = useState(256);
-  const [ecLevel, setEcLevel] = useState("M");
+  const [ecLevel, setEcLevel] = useState<EcLevel>("M");
   const [fgColor, setFgColor] = useState("#f1f5f9");
   const [bgColor, setBgColor] = useState("#1e293b");
-  const canvasRef = useRef(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   function downloadPng() {
     const canvas = canvasRef.current?.querySelector("canvas");

@@ -1,22 +1,32 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { loadMap } from "../utils/urlShortener";
 
 export default function RedirectHandler() {
-  const { shortId } = useParams();
-  const [error, setError] = useState(null);
+  const { shortId } = useParams<{ shortId: string }>();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     try {
-      const map = JSON.parse(localStorage.getItem("devtools-url-map") || "{}");
-      const target = map[shortId];
+      const map = loadMap();
+      const target = shortId ? map[shortId] : undefined;
       if (target) {
         window.location.replace(target);
       } else {
-        setError(`No URL found for short ID: ${shortId}`);
+        const msg = `No URL found for short ID: ${shortId ?? "unknown"}`;
+        queueMicrotask(() => {
+          if (!cancelled) setError(msg);
+        });
       }
     } catch {
-      setError("Failed to look up short URL.");
+      queueMicrotask(() => {
+        if (!cancelled) setError("Failed to look up short URL.");
+      });
     }
+    return () => {
+      cancelled = true;
+    };
   }, [shortId]);
 
   if (error) {

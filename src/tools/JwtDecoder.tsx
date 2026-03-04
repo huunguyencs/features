@@ -1,31 +1,9 @@
 import { useState, useMemo } from "react";
+import { decodeJwt, formatDate, type JwtDecoded } from "../utils/jwt";
 
-function b64UrlDecode(str) {
-  const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const padded = base64 + "==".slice(0, (4 - (base64.length % 4)) % 4);
-  try {
-    return JSON.parse(decodeURIComponent(escape(atob(padded))));
-  } catch {
-    return null;
-  }
-}
+const NOW_SECONDS = Math.floor(Date.now() / 1000);
 
-function formatDate(ts) {
-  return new Date(ts * 1000).toLocaleString();
-}
-
-function decodeJwt(token) {
-  const parts = token.trim().split(".");
-  if (parts.length !== 3)
-    return { error: "Invalid JWT — expected 3 dot-separated parts." };
-  const header = b64UrlDecode(parts[0]);
-  const payload = b64UrlDecode(parts[1]);
-  if (!header || !payload)
-    return { error: "Failed to decode JWT parts (invalid Base64URL or JSON)." };
-  return { header, payload, signature: parts[2] };
-}
-
-function JsonView({ data }) {
+function JsonView({ data }: { data: unknown }) {
   return (
     <pre className="output-block text-xs leading-5 overflow-x-auto">
       {JSON.stringify(data, null, 2)}
@@ -41,11 +19,13 @@ export default function JwtDecoder() {
     return decodeJwt(token);
   }, [token]);
 
-  const exp = decoded?.payload?.exp;
-  const iat = decoded?.payload?.iat;
-  const nbf = decoded?.payload?.nbf;
-  // eslint-disable-next-line react-hooks/purity
-  const isExpired = exp && exp < Math.floor(Date.now() / 1000);
+  const isDecoded = decoded && !("error" in decoded);
+  const payload = isDecoded ? (decoded as JwtDecoded).payload : null;
+
+  const exp = payload?.exp;
+  const iat = payload?.iat;
+  const nbf = payload?.nbf;
+  const isExpired = exp !== undefined && exp < NOW_SECONDS;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -87,48 +67,48 @@ export default function JwtDecoder() {
         />
       </div>
 
-      {decoded?.error && (
+      {decoded && "error" in decoded && (
         <div className="tool-card">
           <p className="text-red-400 text-sm">{decoded.error}</p>
         </div>
       )}
 
-      {decoded && !decoded.error && (
+      {isDecoded && (
         <div className="space-y-4">
           {/* Header */}
           <div className="tool-card space-y-2">
             <h2 className="font-semibold text-text-primary">Header</h2>
-            <JsonView data={decoded.header} />
+            <JsonView data={(decoded as JwtDecoded).header} />
           </div>
 
           {/* Payload */}
           <div className="tool-card space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="font-semibold text-text-primary">Payload</h2>
-              {exp && (
+              {exp !== undefined && (
                 <span className={isExpired ? "badge-invalid" : "badge-valid"}>
                   {isExpired ? "Expired" : "Not expired"}
                 </span>
               )}
             </div>
-            <JsonView data={decoded.payload} />
+            <JsonView data={(decoded as JwtDecoded).payload} />
 
             {/* Time fields */}
-            {(exp || iat || nbf) && (
+            {(exp !== undefined || iat !== undefined || nbf !== undefined) && (
               <div className="space-y-1 mt-2 text-sm">
-                {iat && (
+                {iat !== undefined && (
                   <p className="text-text-secondary">
                     <span className="text-text-muted font-mono mr-2">iat</span>
                     Issued at: {formatDate(iat)}
                   </p>
                 )}
-                {nbf && (
+                {nbf !== undefined && (
                   <p className="text-text-secondary">
                     <span className="text-text-muted font-mono mr-2">nbf</span>
                     Not before: {formatDate(nbf)}
                   </p>
                 )}
-                {exp && (
+                {exp !== undefined && (
                   <p
                     className={
                       isExpired ? "text-red-400" : "text-text-secondary"
@@ -151,7 +131,7 @@ export default function JwtDecoder() {
           <div className="tool-card space-y-2">
             <h2 className="font-semibold text-text-primary">Signature (raw)</h2>
             <div className="output-block text-xs break-all">
-              {decoded.signature}
+              {(decoded as JwtDecoded).signature}
             </div>
           </div>
         </div>

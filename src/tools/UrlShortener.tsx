@@ -1,35 +1,18 @@
 import { useState } from "react";
 import { nanoid } from "nanoid";
-
-const MAP_KEY = "devtools-url-map";
-const HISTORY_KEY = "devtools-url-history";
-const MAX_HISTORY = 20;
-
-function loadMap() {
-  try {
-    return JSON.parse(localStorage.getItem(MAP_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-function loadHistory() {
-  try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-function saveMap(map) {
-  localStorage.setItem(MAP_KEY, JSON.stringify(map));
-}
-function saveHistory(history) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-}
+import {
+  MAX_HISTORY,
+  loadMap,
+  loadHistory,
+  saveMap,
+  saveHistory,
+  type HistoryEntry,
+} from "../utils/urlShortener";
 
 export default function UrlShortener() {
   const [input, setInput] = useState("");
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState(loadHistory);
+  const [result, setResult] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,7 +39,7 @@ export default function UrlShortener() {
     map[id] = url;
     saveMap(map);
 
-    const newEntry = { id, shortUrl, original: url, createdAt: Date.now() };
+    const newEntry: HistoryEntry = { id, shortUrl, original: url, createdAt: Date.now() };
     const newHistory = [newEntry, ...history].slice(0, MAX_HISTORY);
     saveHistory(newHistory);
     setHistory(newHistory);
@@ -64,14 +47,14 @@ export default function UrlShortener() {
     setInput("");
   }
 
-  function copyToClipboard(text) {
+  function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   }
 
-  function deleteEntry(id) {
+  function deleteEntry(id: string) {
     const map = loadMap();
     delete map[id];
     saveMap(map);
