@@ -7,6 +7,7 @@ import Base64Tool from "./tools/Base64Tool";
 import JsonFormatter from "./tools/JsonFormatter";
 import HashGenerator from "./tools/HashGenerator";
 import QrGenerator from "./tools/QrGenerator";
+import RegexTester from "./tools/RegexTester";
 import RedirectHandler from "./tools/RedirectHandler";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/json-formatter" element={<JsonFormatter />} />
           <Route path="/hash-generator" element={<HashGenerator />} />
           <Route path="/qr-generator" element={<QrGenerator />} />
+          <Route path="/regex-tester" element={<RegexTester />} />
         </Route>
       </Routes>
     </HashRouter>
