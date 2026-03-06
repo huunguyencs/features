@@ -1,5 +1,5 @@
 import { useState, useRef, type ChangeEvent } from "react";
-import { encodeText, decodeText } from "../utils/base64";
+import { encodeText, decodeText } from "@huunguyencs/utils";
 
 interface FileInfo {
   name: string;

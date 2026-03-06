@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
-import { hashBuffer, textToBuffer, type HashResult } from "../utils/hash";
+import { hashBuffer, textToBuffer, type HashResult } from "@huunguyencs/utils";
 
 interface FileInfo {
   name: string;

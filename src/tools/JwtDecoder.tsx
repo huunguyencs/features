@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { decodeJwt, formatDate, type JwtDecoded } from "../utils/jwt";
+import { decodeJwt, formatDate, type JwtDecoded } from "@huunguyencs/utils";
 
 const NOW_SECONDS = Math.floor(Date.now() / 1000);
 

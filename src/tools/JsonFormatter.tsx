@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { debounce } from "../utils/debounce";
+import { debounce } from "@huunguyencs/utils";
 
 export default function JsonFormatter() {
   const [input, setInput] = useState("");

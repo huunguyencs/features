@@ -1,5 +1,5 @@
 import { useState, useCallback, type ChangeEvent } from "react";
-import { CHARSETS, generateToken, type CharsetOptions, type CharsetKey } from "../utils/token";
+import { CHARSETS, generateToken, type CharsetOptions, type CharsetKey } from "@huunguyencs/utils";
 
 export default function TokenGenerator() {
   const [length, setLength] = useState(32);
