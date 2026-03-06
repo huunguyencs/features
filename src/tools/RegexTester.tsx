@@ -254,7 +254,10 @@ export default function RegexTester() {
 
         {/* Error / match count */}
         {regexError && (
-          <p className="text-red-400 text-sm font-mono">{regexError}</p>
+          <div className="space-y-1">
+            <span className="badge-invalid">Invalid pattern</span>
+            <p className="text-red-400 text-xs font-mono">{regexError}</p>
+          </div>
         )}
         {!regexError && matches.length > 0 && (
           <span className="badge-valid">
