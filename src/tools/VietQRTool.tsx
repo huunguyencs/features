@@ -10,6 +10,9 @@ import type { Bank } from "./vietqrMath";
 function BankLogo({ code, size = 28 }: { code: string; size?: number }) {
   const [failed, setFailed] = useState(false);
   const initial = code[0]?.toUpperCase() ?? "?";
+  // Container slightly larger than image to give white padding
+  const containerSize = size + 8;
+  const imgSize = size;
   if (failed) {
     return (
       <div
@@ -21,14 +24,19 @@ function BankLogo({ code, size = 28 }: { code: string; size?: number }) {
     );
   }
   return (
-    <img
-      src={`https://cdn.vietqr.io/img/${code}.png`}
-      alt={code}
-      width={size}
-      height={size}
-      className="rounded-sm object-contain shrink-0"
-      onError={() => setFailed(true)}
-    />
+    <div
+      className="bg-white rounded flex items-center justify-center shrink-0"
+      style={{ width: containerSize, height: containerSize }}
+    >
+      <img
+        src={`https://cdn.vietqr.io/img/${code}.png`}
+        alt={code}
+        width={imgSize}
+        height={imgSize}
+        className="object-contain"
+        onError={() => setFailed(true)}
+      />
+    </div>
   );
 }
 
@@ -274,25 +282,67 @@ export default function VietQRTool() {
   }
 
   function downloadPng() {
-    if (!generatedPayload) return;
-    const canvas = canvasRef.current?.querySelector("canvas");
-    if (!canvas) return;
-    const url = canvas.toDataURL("image/png");
+    if (!generatedPayload || !selectedBank) return;
+    const qrCanvas = canvasRef.current?.querySelector("canvas");
+    if (!qrCanvas) return;
+
+    // Build label lines for download
+    const labelLines: string[] = [
+      `Bank: ${selectedBank.name}`,
+      `Account: ${accountNumber.trim()}`,
+    ];
+    if (amount.trim()) {
+      labelLines.push(
+        `Amount: ${Number(amount.trim()).toLocaleString("en-US")} VND`
+      );
+    }
+    if (description.trim()) {
+      labelLines.push(`Note: ${description.trim()}`);
+    }
+
+    const qrSize = qrCanvas.width; // 220 * devicePixelRatio
+    const lineHeight = 20;
+    const padding = 12;
+    const labelAreaHeight = padding + labelLines.length * lineHeight + padding;
+    const totalHeight = qrSize + labelAreaHeight;
+
+    // Compose final canvas
+    const out = document.createElement("canvas");
+    out.width = qrSize;
+    out.height = totalHeight;
+    const ctx = out.getContext("2d");
+    if (!ctx) return;
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, qrSize, totalHeight);
+
+    // Draw QR image at top
+    ctx.drawImage(qrCanvas, 0, 0, qrSize, qrSize);
+
+    // Draw labels
+    ctx.fillStyle = "#374151"; // gray-700
+    ctx.font = `${Math.round(qrSize / 15)}px sans-serif`;
+    ctx.textAlign = "center";
+    labelLines.forEach((line, i) => {
+      ctx.fillText(line, qrSize / 2, qrSize + padding + (i + 1) * lineHeight);
+    });
+
+    const url = out.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
     a.download = "vietqr.png";
     a.click();
+
     // Save to recents on download
-    if (selectedBank) {
-      const entry: RecentEntry = {
-        bin: selectedBank.bin,
-        code: selectedBank.code,
-        shortName: selectedBank.shortName,
-        name: selectedBank.name,
-        accountNumber: accountNumber.trim(),
-      };
-      setRecents((prev) => saveRecent(entry, prev));
-    }
+    const entry: RecentEntry = {
+      bin: selectedBank.bin,
+      code: selectedBank.code,
+      shortName: selectedBank.shortName,
+      name: selectedBank.name,
+      accountNumber: accountNumber.trim(),
+    };
+    setRecents((prev) => saveRecent(entry, prev));
   }
 
   const AMOUNT_PRESETS = [
@@ -390,8 +440,8 @@ export default function VietQRTool() {
         <div className="tool-card flex flex-col items-center justify-center gap-4 min-h-[280px]">
           {generatedPayload ? (
             <>
-              {/* QR with padding so the code has breathing room */}
-              <div className="bg-white p-4 rounded-lg">
+              {/* QR with padding + labels below */}
+              <div className="bg-white p-4 rounded-lg flex flex-col items-center gap-2">
                 <QRCodeSVG
                   value={generatedPayload}
                   size={220}
@@ -399,6 +449,31 @@ export default function VietQRTool() {
                   bgColor="#ffffff"
                   fgColor="#000000"
                 />
+                {/* Labels below QR */}
+                <div className="w-full text-xs text-gray-700 space-y-0.5 pt-1 border-t border-gray-200">
+                  <div className="flex gap-1">
+                    <span className="text-gray-400 w-16 shrink-0">Bank</span>
+                    <span className="font-medium">{selectedBank?.name}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <span className="text-gray-400 w-16 shrink-0">Account</span>
+                    <span className="font-medium">{accountNumber.trim()}</span>
+                  </div>
+                  {amount.trim() && (
+                    <div className="flex gap-1">
+                      <span className="text-gray-400 w-16 shrink-0">Amount</span>
+                      <span className="font-medium">
+                        {Number(amount.trim()).toLocaleString("en-US")} VND
+                      </span>
+                    </div>
+                  )}
+                  {description.trim() && (
+                    <div className="flex gap-1">
+                      <span className="text-gray-400 w-16 shrink-0">Note</span>
+                      <span className="font-medium">{description.trim()}</span>
+                    </div>
+                  )}
+                </div>
               </div>
               {/* Hidden canvas for download */}
               <div ref={canvasRef} className="hidden">
