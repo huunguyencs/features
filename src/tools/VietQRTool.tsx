@@ -41,6 +41,31 @@ function BankLogo({ code, size = 28 }: { code: string; size?: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// NapasLogo — shows napas247 logo with fallback to styled text
+// ---------------------------------------------------------------------------
+
+function NapasLogo({ size = 32 }: { size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span className="text-teal-600 font-medium text-sm">
+        napas <strong>247</strong>
+      </span>
+    );
+  }
+  return (
+    <img
+      src="https://cdn.vietqr.io/img/NAPAS.png"
+      alt="napas247"
+      height={size}
+      className="object-contain"
+      style={{ height: size }}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // BankSelector — combobox with floating dropdown, collapses after selection
 // ---------------------------------------------------------------------------
 
@@ -186,6 +211,15 @@ function stripFormatting(formatted: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Account number masking helper
+// ---------------------------------------------------------------------------
+
+function maskAccount(account: string): string {
+  if (account.length <= 6) return account;
+  return account.slice(0, 3) + "****" + account.slice(-3);
+}
+
+// ---------------------------------------------------------------------------
 // localStorage recents helpers
 // ---------------------------------------------------------------------------
 
@@ -233,12 +267,14 @@ function saveRecent(
 export default function VietQRTool() {
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
+  const [holderName, setHolderName] = useState("");
   // amount stores the raw numeric string (no commas)
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [recents, setRecents] = useState<RecentEntry[]>(() => loadRecents());
   // generatedPayload is only set when user clicks "Generate QR"
   const [generatedPayload, setGeneratedPayload] = useState<string | null>(null);
+  const [showFullAccount, setShowFullAccount] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const isReady = !!selectedBank && accountNumber.trim().length > 0;
@@ -265,6 +301,10 @@ export default function VietQRTool() {
     setGeneratedPayload(null);
   }
 
+  function handleHolderNameChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setHolderName(e.target.value);
+  }
+
   function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = stripFormatting(e.target.value);
     setAmount(raw);
@@ -286,47 +326,103 @@ export default function VietQRTool() {
     const qrCanvas = canvasRef.current?.querySelector("canvas");
     if (!qrCanvas) return;
 
-    // Build label lines for download
-    const labelLines: string[] = [
-      `Bank: ${selectedBank.name}`,
-      `Account: ${accountNumber.trim()}`,
-    ];
-    if (amount.trim()) {
-      labelLines.push(
-        `Amount: ${Number(amount.trim()).toLocaleString("en-US")} VND`
-      );
-    }
-    if (description.trim()) {
-      labelLines.push(`Note: ${description.trim()}`);
-    }
+    const CANVAS_WIDTH = 320;
+    const padding = 16;
+    const qrDisplaySize = CANVAS_WIDTH - padding * 2; // 288px
+    const borderWidth = 3;
+    const logosRowHeight = 40;
+    const lineHeight = 22;
+    const smallLineHeight = 18;
 
-    const qrSize = qrCanvas.width; // 220 * devicePixelRatio
-    const lineHeight = 20;
-    const padding = 12;
-    const labelAreaHeight = padding + labelLines.length * lineHeight + padding;
-    const totalHeight = qrSize + labelAreaHeight;
+    // Calculate total height
+    let totalHeight = padding + qrDisplaySize + padding; // QR section
+    totalHeight += logosRowHeight; // napas + bank logos row
+    totalHeight += padding / 2;
+    if (holderName.trim()) totalHeight += lineHeight;
+    totalHeight += lineHeight; // account number
+    totalHeight += smallLineHeight; // bank full name
+    totalHeight += padding;
 
-    // Compose final canvas
     const out = document.createElement("canvas");
-    out.width = qrSize;
+    out.width = CANVAS_WIDTH;
     out.height = totalHeight;
     const ctx = out.getContext("2d");
     if (!ctx) return;
 
     // White background
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, qrSize, totalHeight);
+    ctx.fillRect(0, 0, CANVAS_WIDTH, totalHeight);
 
-    // Draw QR image at top
-    ctx.drawImage(qrCanvas, 0, 0, qrSize, qrSize);
+    // Draw QR image scaled to fit
+    ctx.drawImage(qrCanvas, padding, padding, qrDisplaySize, qrDisplaySize);
 
-    // Draw labels
-    ctx.fillStyle = "#374151"; // gray-700
-    ctx.font = `${Math.round(qrSize / 15)}px sans-serif`;
+    // Blue border around QR
+    ctx.strokeStyle = "#60a5fa"; // blue-400
+    ctx.lineWidth = borderWidth;
+    ctx.strokeRect(
+      padding - borderWidth / 2,
+      padding - borderWidth / 2,
+      qrDisplaySize + borderWidth,
+      qrDisplaySize + borderWidth
+    );
+
+    let y = padding + qrDisplaySize + padding;
+
+    // Logos row — draw text representation (canvas cross-origin images are restricted)
     ctx.textAlign = "center";
-    labelLines.forEach((line, i) => {
-      ctx.fillText(line, qrSize / 2, qrSize + padding + (i + 1) * lineHeight);
-    });
+    const centerX = CANVAS_WIDTH / 2;
+
+    // napas 247 on left
+    ctx.fillStyle = "#0d9488"; // teal-600
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText("napas 247", centerX - 60, y + logosRowHeight / 2 + 5);
+
+    // Vertical divider
+    ctx.strokeStyle = "#d1d5db"; // gray-300
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(centerX, y + 6);
+    ctx.lineTo(centerX, y + logosRowHeight - 6);
+    ctx.stroke();
+
+    // Bank shortName on right
+    ctx.fillStyle = "#374151"; // gray-700
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText(selectedBank.shortName, centerX + 60, y + logosRowHeight / 2 + 5);
+
+    y += logosRowHeight + padding / 2;
+
+    // Holder name row (if provided)
+    if (holderName.trim()) {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#6b7280"; // gray-500
+      ctx.font = "13px sans-serif";
+      ctx.fillText("Ten chu TK:", padding, y);
+      ctx.fillStyle = "#0d9488"; // teal-600
+      ctx.font = "bold 13px sans-serif";
+      const labelWidth = ctx.measureText("Ten chu TK: ").width;
+      ctx.fillText(holderName.trim().toUpperCase(), padding + labelWidth, y);
+      y += lineHeight;
+    }
+
+    // Account number row
+    const displayAccount = showFullAccount
+      ? accountNumber.trim()
+      : maskAccount(accountNumber.trim());
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#6b7280";
+    ctx.font = "13px sans-serif";
+    ctx.fillText("So TK:", padding, y);
+    ctx.fillStyle = "#111827"; // gray-900
+    ctx.font = "bold 14px sans-serif";
+    const soTkWidth = ctx.measureText("So TK: ").width;
+    ctx.fillText(displayAccount, padding + soTkWidth, y);
+    y += lineHeight;
+
+    // Bank full name
+    ctx.fillStyle = "#9ca3af"; // gray-400
+    ctx.font = "11px sans-serif";
+    ctx.fillText(selectedBank.name, padding, y);
 
     const url = out.toDataURL("image/png");
     const a = document.createElement("a");
@@ -354,6 +450,10 @@ export default function VietQRTool() {
     { label: "2M", value: "2000000" },
   ];
 
+  const displayAccount = showFullAccount
+    ? accountNumber.trim()
+    : maskAccount(accountNumber.trim());
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Page title */}
@@ -373,7 +473,7 @@ export default function VietQRTool() {
           <div className="tool-card space-y-4">
             <BankSelector selected={selectedBank} onSelect={handleBankChange} />
 
-            {/* Account number (VIETQR-02) */}
+            {/* Account number */}
             <div>
               <label className="tool-label">Account Number</label>
               <input
@@ -385,7 +485,21 @@ export default function VietQRTool() {
               />
             </div>
 
-            {/* Amount (VIETQR-03) */}
+            {/* Account holder name (display-only — not included in QR payload) */}
+            <div>
+              <label className="tool-label">
+                Account Holder Name (optional)
+              </label>
+              <input
+                className="tool-input"
+                type="text"
+                placeholder="e.g. NGUYEN VAN A"
+                value={holderName}
+                onChange={handleHolderNameChange}
+              />
+            </div>
+
+            {/* Amount */}
             <div>
               <label className="tool-label">Amount (VND, optional)</label>
               <input
@@ -396,7 +510,7 @@ export default function VietQRTool() {
                 value={formatCurrency(amount)}
                 onChange={handleAmountChange}
               />
-              {/* Amount presets (VIETQR-09) */}
+              {/* Amount presets */}
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {AMOUNT_PRESETS.map((p) => (
                   <button
@@ -410,7 +524,7 @@ export default function VietQRTool() {
               </div>
             </div>
 
-            {/* Description (VIETQR-04) */}
+            {/* Description */}
             <div>
               <label className="tool-label">
                 Description (optional, max 25 chars)
@@ -436,50 +550,98 @@ export default function VietQRTool() {
           </div>
         </div>
 
-        {/* Right: QR display + download (VIETQR-05, 06) */}
+        {/* Right: QR display + download */}
         <div className="tool-card flex flex-col items-center justify-center gap-4 min-h-[280px]">
           {generatedPayload ? (
             <>
-              {/* QR with padding + labels below */}
-              <div className="bg-white p-4 rounded-lg flex flex-col items-center gap-2">
-                <QRCodeSVG
-                  value={generatedPayload}
-                  size={220}
-                  level="M"
-                  bgColor="#ffffff"
-                  fgColor="#000000"
-                />
-                {/* Labels below QR */}
-                <div className="w-full text-xs text-gray-700 space-y-0.5 pt-1 border-t border-gray-200">
-                  <div className="flex gap-1">
-                    <span className="text-gray-400 w-16 shrink-0">Bank</span>
-                    <span className="font-medium">{selectedBank?.name}</span>
+              {/* QR card */}
+              <div className="bg-white rounded-lg p-4 flex flex-col items-center w-full max-w-xs">
+                {/* QR with blue border frame */}
+                <div className="border-2 border-blue-400 rounded p-2 mx-auto w-fit">
+                  <QRCodeSVG
+                    value={generatedPayload}
+                    size={220}
+                    level="M"
+                    bgColor="#ffffff"
+                    fgColor="#000000"
+                  />
+                </div>
+
+                {/* Logos row: napas247 | divider | bank logo */}
+                <div className="flex items-center justify-center gap-4 my-3">
+                  <NapasLogo size={28} />
+                  <div className="w-px h-8 bg-gray-300" />
+                  <BankLogo code={selectedBank?.code ?? ""} size={32} />
+                </div>
+
+                {/* Account holder name — only shown if provided */}
+                {holderName.trim() && (
+                  <div className="w-full text-sm mt-1">
+                    <span className="text-gray-500">Ten chu TK: </span>
+                    <span className="text-teal-600 font-medium uppercase">
+                      {holderName.trim()}
+                    </span>
                   </div>
-                  <div className="flex gap-1">
-                    <span className="text-gray-400 w-16 shrink-0">Account</span>
-                    <span className="font-medium">{accountNumber.trim()}</span>
-                  </div>
-                  {amount.trim() && (
-                    <div className="flex gap-1">
-                      <span className="text-gray-400 w-16 shrink-0">Amount</span>
-                      <span className="font-medium">
-                        {Number(amount.trim()).toLocaleString("en-US")} VND
-                      </span>
-                    </div>
-                  )}
-                  {description.trim() && (
-                    <div className="flex gap-1">
-                      <span className="text-gray-400 w-16 shrink-0">Note</span>
-                      <span className="font-medium">{description.trim()}</span>
-                    </div>
-                  )}
+                )}
+
+                {/* Account number row with toggle */}
+                <div className="w-full flex items-center gap-1 mt-1">
+                  <span className="text-sm text-gray-500">So TK: </span>
+                  <span className="text-base font-bold text-text-primary flex-1">
+                    {displayAccount}
+                  </span>
+                  <button
+                    onClick={() => setShowFullAccount((v) => !v)}
+                    className="text-gray-400 hover:text-gray-600 p-0.5"
+                    title={showFullAccount ? "Hide account number" : "Show full account number"}
+                    aria-label={showFullAccount ? "Hide account number" : "Show full account number"}
+                  >
+                    {showFullAccount ? (
+                      /* Eye-off icon */
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4"
+                      >
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      /* Eye icon */
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4"
+                      >
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+
+                {/* Bank full name */}
+                <div className="w-full text-xs text-gray-500 mt-1">
+                  {selectedBank?.name}
                 </div>
               </div>
+
               {/* Hidden canvas for download */}
               <div ref={canvasRef} className="hidden">
                 <QRCodeCanvas
                   value={generatedPayload}
-                  size={220}
+                  size={288}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#000000"
@@ -504,7 +666,7 @@ export default function VietQRTool() {
         </div>
       </div>
 
-      {/* Recents section (VIETQR-10) — only rendered when recents.length > 0 */}
+      {/* Recents section — only rendered when recents.length > 0 */}
       {recents.length > 0 && (
         <div className="tool-card space-y-2">
           <p className="text-sm font-medium text-text-secondary">Recent</p>
