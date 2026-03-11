@@ -8,6 +8,9 @@ import JsonFormatter from "./tools/JsonFormatter";
 import HashGenerator from "./tools/HashGenerator";
 import QrGenerator from "./tools/QrGenerator";
 import RegexTester from "./tools/RegexTester";
+import ColorConverter from "./tools/ColorConverter";
+import TextDiff from "./tools/TextDiff";
+import VietQRTool from "./tools/VietQRTool";
 import RedirectHandler from "./tools/RedirectHandler";
 
 export default function App() {
@@ -25,6 +28,9 @@ export default function App() {
           <Route path="/hash-generator" element={<HashGenerator />} />
           <Route path="/qr-generator" element={<QrGenerator />} />
           <Route path="/regex-tester" element={<RegexTester />} />
+          <Route path="/color-converter" element={<ColorConverter />} />
+          <Route path="/text-diff" element={<TextDiff />} />
+          <Route path="/vietqr" element={<VietQRTool />} />
         </Route>
       </Routes>
     </HashRouter>

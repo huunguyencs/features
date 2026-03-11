@@ -1,8 +1,19 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { debounce } from "@huunguyencs/utils";
+import Tooltip from "../components/Tooltip";
 
 const ALL_FLAGS = ["g", "i", "m", "s", "u", "d"] as const;
 type Flag = (typeof ALL_FLAGS)[number];
+
+const FLAG_DESCRIPTIONS: Record<Flag, string> = {
+  g: "Global — find all matches",
+  i: "Case insensitive",
+  m: "Multiline — ^ and $ match line breaks",
+  s: "Dot all — . matches newlines too",
+  u: "Unicode — full Unicode support",
+  d: "Indices — include match position data",
+};
+
 
 interface Segment {
   text: string;
@@ -69,6 +80,17 @@ export default function RegexTester() {
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const [copied, setCopied] = useState(false);
+  const [patternCopied, setPatternCopied] = useState(false);
+  const [activePresetLabel, setActivePresetLabel] = useState<string | null>(null);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
+
+  function syncScroll() {
+    if (highlightRef.current && textareaRef.current) {
+      highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  }
 
   const flagsString = ALL_FLAGS.filter((f) => selectedFlags.has(f)).join("");
 
@@ -207,6 +229,7 @@ export default function RegexTester() {
             .filter((c) => (ALL_FLAGS as readonly string[]).includes(c)) as Flag[],
         ),
       );
+      setActivePresetLabel(preset.label);
     } else if (val.startsWith("saved:")) {
       const idx = parseInt(val.slice(6), 10);
       const sp = savedPatterns[idx];
@@ -219,6 +242,7 @@ export default function RegexTester() {
             .filter((c) => (ALL_FLAGS as readonly string[]).includes(c)) as Flag[],
         ),
       );
+      setActivePresetLabel(sp.name);
     }
   }
 
@@ -236,41 +260,66 @@ export default function RegexTester() {
 
       {/* Pattern & Flags card */}
       <div className="tool-card space-y-4">
-        {/* Presets dropdown + Save pattern button */}
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="tool-label">Patterns</label>
-            <select
-              className="tool-input"
-              value=""
-              onChange={handlePresetChange}
-            >
-              <option value="">— Load preset —</option>
-              <optgroup label="Common patterns">
-                {PRESETS.map((p) => (
-                  <option key={p.key} value={`preset:${p.key}`}>
-                    {p.label}
-                  </option>
-                ))}
-              </optgroup>
-              {savedPatterns.length > 0 && (
-                <optgroup label="My patterns">
-                  {savedPatterns.map((sp, i) => (
-                    <option key={i} value={`saved:${i}`}>
-                      {sp.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-          <button
-            className="btn-secondary text-xs mb-0.5"
-            onClick={() => setShowSaveInput((v) => !v)}
+        {/* Presets dropdown — common patterns only */}
+        <div>
+          <label className="tool-label">Common patterns</label>
+          <select
+            className="tool-input"
+            value=""
+            onChange={handlePresetChange}
           >
-            Save pattern
-          </button>
+            <option value="">— Load preset —</option>
+            {PRESETS.map((p) => (
+              <option key={p.key} value={`preset:${p.key}`}>
+                {p.label}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {/* My patterns — chips */}
+        {savedPatterns.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs text-text-muted">My patterns</p>
+            <div className="flex flex-wrap gap-1.5">
+              {savedPatterns.map((sp, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center rounded border border-white/10 bg-surface-raised text-xs font-mono overflow-hidden"
+                >
+                  <button
+                    className="px-2.5 py-1 text-text-secondary hover:text-text-primary hover:bg-white/5 transition-colors"
+                    title={`Load: /${sp.pattern}/${sp.flags}`}
+                    onClick={() => {
+                      setPattern(sp.pattern);
+                      setSelectedFlags(
+                        new Set(
+                          sp.flags
+                            .split("")
+                            .filter((c) => (ALL_FLAGS as readonly string[]).includes(c)) as Flag[],
+                        ),
+                      );
+                      setActivePresetLabel(sp.name);
+                    }}
+                  >
+                    {sp.name}
+                  </button>
+                  <button
+                    className="px-1.5 py-1 text-text-muted hover:text-red-400 border-l border-white/10 hover:bg-white/5 transition-colors"
+                    title="Delete"
+                    onClick={() => {
+                      const next = savedPatterns.filter((_, j) => j !== i);
+                      setSavedPatterns(next);
+                      persistSavedPatterns(next);
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Inline save input */}
         {showSaveInput && (
@@ -301,41 +350,72 @@ export default function RegexTester() {
           </div>
         )}
 
-        {/* Saved pattern delete list */}
-        {savedPatterns.length > 0 && (
-          <div className="space-y-1">
-            {savedPatterns.map((sp, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between text-xs text-text-secondary px-1"
-              >
-                <span className="font-mono truncate max-w-[80%]">{sp.name}</span>
-                <button
-                  className="text-text-muted hover:text-red-400 transition-colors px-1"
-                  onClick={() => {
-                    const next = savedPatterns.filter((_, j) => j !== i);
-                    setSavedPatterns(next);
-                    persistSavedPatterns(next);
-                  }}
-                  title="Delete pattern"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pattern input */}
-        <div>
+        {/* Pattern input with / delimiter decoration + save + copy icons */}
+        <div className="space-y-1.5">
           <label className="tool-label">Pattern</label>
-          <input
-            className="tool-input font-mono"
-            placeholder={String.raw`e.g. \b\w+\b`}
-            value={pattern}
-            onChange={(e) => setPattern(e.target.value)}
-            spellCheck={false}
-          />
+          <div className="flex items-center gap-2">
+            <div
+              className="tool-input flex-1 flex items-center font-mono text-sm cursor-text gap-0"
+              onClick={() => (document.getElementById("pattern-input") as HTMLInputElement)?.focus()}
+            >
+              <span className="text-text-secondary select-none shrink-0 opacity-75">/</span>
+              <input
+                id="pattern-input"
+                className="bg-transparent outline-none border-0 p-0 font-mono text-sm text-text-primary placeholder-text-muted min-w-[2ch]"
+                style={{ width: `${Math.max(pattern.length, 3)}ch` }}
+                placeholder={String.raw`\d+`}
+                value={pattern}
+                onChange={(e) => { setPattern(e.target.value); setActivePresetLabel(null); }}
+                spellCheck={false}
+              />
+              <span className="text-text-secondary select-none shrink-0 opacity-75">{"/" + flagsString}</span>
+            </div>
+            {/* Save / Cancel icon button */}
+            <Tooltip text={showSaveInput ? "Cancel" : "Save pattern"}>
+              <button
+                className="btn-secondary p-2 shrink-0"
+                onClick={() => setShowSaveInput((v) => !v)}
+              >
+                {showSaveInput ? (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
+            {/* Copy regex literal icon button */}
+            <Tooltip text={patternCopied ? "Copied!" : "Copy"}>
+              <button
+                className="btn-secondary p-2 shrink-0"
+                onClick={() => {
+                  navigator.clipboard.writeText(`/${pattern}/${flagsString}`).then(() => {
+                    setPatternCopied(true);
+                    setTimeout(() => setPatternCopied(false), 2000);
+                  });
+                }}
+              >
+                {patternCopied ? (
+                  <svg className="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
+          </div>
+          {/* Active preset label */}
+          {activePresetLabel && (
+            <p className="text-xs text-text-muted">
+              Loaded: <span className="text-text-secondary">{activePresetLabel}</span>
+            </p>
+          )}
         </div>
 
         {/* Flags */}
@@ -343,18 +423,17 @@ export default function RegexTester() {
           <label className="tool-label">Flags</label>
           <div className="flex flex-wrap gap-3">
             {ALL_FLAGS.map((flag) => (
-              <label
-                key={flag}
-                className="flex items-center gap-1.5 text-sm text-text-secondary cursor-pointer select-none"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedFlags.has(flag)}
-                  onChange={() => toggleFlag(flag)}
-                  className="accent-accent-primary"
-                />
-                <span className="font-mono">{flag}</span>
-              </label>
+              <Tooltip key={flag} text={FLAG_DESCRIPTIONS[flag]}>
+                <label className="flex items-center gap-1.5 text-sm text-text-secondary cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedFlags.has(flag)}
+                    onChange={() => toggleFlag(flag)}
+                    className="accent-accent-primary"
+                  />
+                  <span className="font-mono">{flag}</span>
+                </label>
+              </Tooltip>
             ))}
           </div>
         </div>
@@ -433,40 +512,38 @@ export default function RegexTester() {
         )}
       </div>
 
-      {/* Test text & highlighted matches card */}
-      <div className="tool-card space-y-4">
-        <div>
-          <label className="tool-label">Test Text</label>
+      {/* Test text with inline highlight overlay */}
+      <div className="tool-card">
+        <label className="tool-label">Test Text</label>
+        <div className="relative w-full bg-surface-overlay border border-text-muted rounded-lg transition-colors focus-within:border-accent-primary focus-within:ring-1 focus-within:ring-accent-primary">
+          {/* Highlight backdrop — same font/padding as textarea, text transparent, match backgrounds visible */}
+          <div
+            ref={highlightRef}
+            className="absolute inset-0 px-3 py-2 font-mono text-sm leading-relaxed whitespace-pre-wrap break-words overflow-hidden pointer-events-none select-none"
+            aria-hidden="true"
+          >
+            {segments.length > 0
+              ? segments.map((seg, i) =>
+                  seg.isMatch ? (
+                    <span key={i} className="bg-yellow-400/30 text-transparent rounded">{seg.text}</span>
+                  ) : (
+                    <span key={i} className="text-transparent">{seg.text}</span>
+                  ),
+                )
+              : <span className="text-transparent">{testText}</span>
+            }
+          </div>
+          {/* Textarea — transparent background so highlight layer shows through */}
           <textarea
-            className="tool-textarea h-40 font-mono"
+            ref={textareaRef}
+            className="relative w-full min-h-[10rem] bg-transparent border-0 outline-none resize-y font-mono text-sm leading-relaxed px-3 py-2 placeholder-text-muted text-text-primary"
             placeholder="Paste or type text to test against..."
             value={testText}
             onChange={(e) => setTestText(e.target.value)}
+            onScroll={syncScroll}
             spellCheck={false}
           />
         </div>
-
-        {testText && (
-          <div>
-            <label className="tool-label">Highlighted Matches</label>
-            <pre className="output-block whitespace-pre-wrap break-all font-mono text-sm leading-relaxed">
-              {segments.length > 0
-                ? segments.map((seg, i) =>
-                    seg.isMatch ? (
-                      <mark
-                        key={i}
-                        className="bg-yellow-400/30 text-yellow-200 rounded px-0.5"
-                      >
-                        {seg.text}
-                      </mark>
-                    ) : (
-                      <span key={i}>{seg.text}</span>
-                    ),
-                  )
-                : testText}
-            </pre>
-          </div>
-        )}
       </div>
 
       {/* Match details table */}

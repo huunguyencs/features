@@ -42,6 +42,9 @@ export default function ColorConverter() {
   const [wcagMode, setWcagMode] = useState<"white" | "black" | "custom">("white");
   const [wcagCustomInput, setWcagCustomInput] = useState<string>("");
 
+  // Gamut badge — tracks raw (pre-clamp) OKLCH input; cleared on non-OKLCH edits or swatch pick
+  const [rawOutOfGamut, setRawOutOfGamut] = useState<boolean>(false);
+
   // ---------------------------------------------------------------------------
   // Derived state via useMemo
   // ---------------------------------------------------------------------------
@@ -49,7 +52,6 @@ export default function ColorConverter() {
   const rgb    = useMemo(() => hexToRgb(hex), [hex]);
   const hsl    = useMemo(() => rgbToHsl(rgb.r, rgb.g, rgb.b), [rgb]);
   const oklch  = useMemo(() => rgbToOklch(rgb.r, rgb.g, rgb.b), [rgb]);
-  const outOfGamut = useMemo(() => isOutOfGamut(oklch.l, oklch.c, oklch.h), [oklch]);
 
   // CSS display strings
   const hexStr   = useMemo(() => hex.toUpperCase(), [hex]);
@@ -113,20 +115,22 @@ export default function ColorConverter() {
         } else if (field === "oklch") {
           const o = parseOklch(value);
           if (o) {
-            // Out-of-gamut OKLCH: parse succeeds, clamp to sRGB
-            const clamped = clampToSRGB(o.l, o.c, o.h);
-            newHex = rgbToHex(clamped.r, clamped.g, clamped.b);
-            // Check if actually out of gamut (before clamping)
-            if (isOutOfGamut(o.l, o.c, o.h)) {
-              // newHex is already the clamped value
+            const outOfGamut = isOutOfGamut(o.l, o.c, o.h);
+            setRawOutOfGamut(outOfGamut);
+            if (outOfGamut) {
+              const clamped = clampToSRGB(o.l, o.c, o.h);
+              newHex = rgbToHex(clamped.r, clamped.g, clamped.b);
             } else {
               const inGamutRgb = oklchToRgb(o.l, o.c, o.h);
               newHex = rgbToHex(inGamutRgb.r, inGamutRgb.g, inGamutRgb.b);
             }
+          } else {
+            // Unparseable input — leave badge state as-is until valid parse
           }
         }
 
         if (newHex) setHex(newHex);
+        if (field !== "oklch") setRawOutOfGamut(false);
       }, 150),
     []
   );
@@ -186,7 +190,7 @@ export default function ColorConverter() {
             )}
           </button>
         </div>
-        {field === "oklch" && outOfGamut && (
+        {field === "oklch" && rawOutOfGamut && (
           <span className="badge-invalid text-xs">Out of sRGB gamut</span>
         )}
       </div>
@@ -216,7 +220,7 @@ export default function ColorConverter() {
           <input
             type="color"
             value={hex}
-            onChange={(e) => setHex(e.target.value)}
+            onChange={(e) => { setHex(e.target.value); setRawOutOfGamut(false); }}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             aria-label="Pick color"
           />

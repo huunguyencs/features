@@ -191,6 +191,66 @@ const tools: Tool[] = [
       </svg>
     ),
   },
+  {
+    path: "/color-converter",
+    label: "Color Converter",
+    icon: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-5 h-5"
+      >
+        <circle cx="13.5" cy="6.5" r="1.5" />
+        <circle cx="17.5" cy="10.5" r="1.5" />
+        <circle cx="8.5" cy="7.5" r="1.5" />
+        <circle cx="6.5" cy="12.5" r="1.5" />
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10" />
+      </svg>
+    ),
+  },
+  {
+    path: "/text-diff",
+    label: "Text Diff",
+    icon: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-5 h-5"
+      >
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="10" x2="14" y2="10" />
+        <line x1="3" y1="14" x2="21" y2="14" />
+        <line x1="3" y1="18" x2="14" y2="18" />
+      </svg>
+    ),
+  },
+  {
+    path: "/vietqr",
+    label: "VietQR",
+    icon: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="w-5 h-5"
+      >
+        {/* Credit card + horizontal line = bank transfer */}
+        <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
+        <line x1="2" y1="10" x2="22" y2="10" />
+      </svg>
+    ),
+  },
 ];
 
 interface SidebarProps {
