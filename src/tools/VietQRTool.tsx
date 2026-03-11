@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { QRCodeSVG, QRCodeCanvas } from "qrcode.react";
 import { buildVietQRPayload, BANKS } from "./vietqrMath";
 import type { Bank } from "./vietqrMath";
@@ -33,7 +33,7 @@ function BankLogo({ code, size = 28 }: { code: string; size?: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// BankSelector — search + scrollable bank list, collapses after selection
+// BankSelector — combobox with floating dropdown, collapses after selection
 // ---------------------------------------------------------------------------
 
 interface BankSelectorProps {
@@ -43,7 +43,24 @@ interface BankSelectorProps {
 
 function BankSelector({ selected, onSelect }: BankSelectorProps) {
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const filtered = useMemo(() => {
     if (!query) return BANKS;
@@ -55,62 +72,109 @@ function BankSelector({ selected, onSelect }: BankSelectorProps) {
     );
   }, [query]);
 
-  // Collapsed view: selected bank is shown with a "Change" button
-  if (selected !== null && !open) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 tool-card rounded-md">
-        <BankLogo code={selected.code} />
-        <span className="text-sm text-text-primary font-medium">
-          {selected.shortName}
-        </span>
-        <span className="text-xs text-text-muted truncate flex-1">
-          {selected.name}
-        </span>
-        <button
-          onClick={() => setOpen(true)}
-          className="btn-secondary text-xs shrink-0"
-        >
-          Change
-        </button>
-      </div>
-    );
+  function handleSelect(bank: Bank) {
+    onSelect(bank);
+    setIsOpen(false);
+    setQuery("");
   }
 
-  // Expanded view: search input + scrollable list
+  function handleInputFocus() {
+    setIsOpen(true);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setQuery(e.target.value);
+    setIsOpen(true);
+  }
+
+  // Display value: when not searching show selected bank name, otherwise show query
+  const displayValue = isOpen ? query : selected ? selected.shortName : "";
+
   return (
-    <div className="tool-card space-y-2">
-      <input
-        className="tool-input mb-2"
-        type="text"
-        placeholder="Search bank name or code…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        autoFocus={open}
-      />
-      <div className="max-h-48 overflow-y-auto space-y-0.5">
-        {filtered.length === 0 && (
-          <p className="text-xs text-text-muted px-3 py-2">No banks found.</p>
+    <div ref={containerRef} className="relative">
+      <label className="tool-label">Bank</label>
+      <div
+        className="tool-input flex items-center gap-2 cursor-pointer"
+        onClick={() => {
+          setIsOpen(true);
+          inputRef.current?.focus();
+        }}
+      >
+        {selected && !isOpen && (
+          <BankLogo code={selected.code} size={20} />
         )}
-        {filtered.map((bank) => (
-          <div
-            key={bank.bin}
-            onClick={() => {
-              onSelect(bank);
-              setOpen(false);
-              setQuery("");
-            }}
-            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-overlay rounded-md"
-          >
-            <BankLogo code={bank.code} />
-            <span className="text-sm text-text-primary">{bank.shortName}</span>
-            <span className="text-xs text-text-muted truncate">
-              {bank.name}
-            </span>
-          </div>
-        ))}
+        <input
+          ref={inputRef}
+          type="text"
+          className="flex-1 bg-transparent outline-none text-sm text-text-primary placeholder:text-text-muted min-w-0"
+          placeholder="Search or select a bank…"
+          value={displayValue}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
+        />
+        {/* Chevron indicator */}
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </div>
+
+      {/* Floating dropdown */}
+      {isOpen && (
+        <div className="absolute z-50 left-0 right-0 mt-1 tool-card border border-surface-overlay shadow-lg max-h-48 overflow-y-auto">
+          {filtered.length === 0 && (
+            <p className="text-xs text-text-muted px-3 py-2">No banks found.</p>
+          )}
+          {filtered.map((bank) => (
+            <div
+              key={bank.bin}
+              onMouseDown={(e) => {
+                // Use mousedown to prevent input blur before click fires
+                e.preventDefault();
+                handleSelect(bank);
+              }}
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-surface-overlay"
+            >
+              <BankLogo code={bank.code} size={22} />
+              <span className="text-sm font-medium text-text-primary">
+                {bank.shortName}
+              </span>
+              <span className="text-xs text-text-muted truncate">
+                {bank.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Selected bank full name display (when closed + selected) */}
+      {selected && !isOpen && (
+        <p className="text-sm text-text-primary mt-1">{selected.name}</p>
+      )}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Currency formatting helpers
+// ---------------------------------------------------------------------------
+
+function formatCurrency(raw: string): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("en-US");
+}
+
+function stripFormatting(formatted: string): string {
+  return formatted.replace(/\D/g, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -161,25 +225,56 @@ function saveRecent(
 export default function VietQRTool() {
   const [selectedBank, setSelectedBank] = useState<Bank | null>(null);
   const [accountNumber, setAccountNumber] = useState("");
+  // amount stores the raw numeric string (no commas)
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [recents, setRecents] = useState<RecentEntry[]>(() => loadRecents());
+  // generatedPayload is only set when user clicks "Generate QR"
+  const [generatedPayload, setGeneratedPayload] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   const isReady = !!selectedBank && accountNumber.trim().length > 0;
 
-  const payload = useMemo(() => {
-    if (!isReady || !selectedBank) return "";
-    return buildVietQRPayload({
+  function handleGenerateQR() {
+    if (!isReady || !selectedBank) return;
+    const payload = buildVietQRPayload({
       bin: selectedBank.bin,
       accountNumber: accountNumber.trim(),
       amount: amount.trim() || undefined,
       description: description.trim() || undefined,
     });
-  }, [isReady, selectedBank, accountNumber, amount, description]);
+    setGeneratedPayload(payload);
+  }
+
+  // Clear generated QR when key inputs change (so the user knows they need to regenerate)
+  function handleBankChange(bank: Bank) {
+    setSelectedBank(bank);
+    setGeneratedPayload(null);
+  }
+
+  function handleAccountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setAccountNumber(e.target.value);
+    setGeneratedPayload(null);
+  }
+
+  function handleAmountChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = stripFormatting(e.target.value);
+    setAmount(raw);
+    setGeneratedPayload(null);
+  }
+
+  function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setDescription(e.target.value);
+    setGeneratedPayload(null);
+  }
+
+  function handlePreset(value: string) {
+    setAmount(value);
+    setGeneratedPayload(null);
+  }
 
   function downloadPng() {
-    if (!isReady) return;
+    if (!generatedPayload) return;
     const canvas = canvasRef.current?.querySelector("canvas");
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
@@ -226,7 +321,7 @@ export default function VietQRTool() {
         {/* Left: bank selector + form fields */}
         <div className="space-y-4">
           <div className="tool-card space-y-4">
-            <BankSelector selected={selectedBank} onSelect={setSelectedBank} />
+            <BankSelector selected={selectedBank} onSelect={handleBankChange} />
 
             {/* Account number (VIETQR-02) */}
             <div>
@@ -236,7 +331,7 @@ export default function VietQRTool() {
                 type="text"
                 placeholder="e.g. 1234567890"
                 value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
+                onChange={handleAccountChange}
               />
             </div>
 
@@ -247,18 +342,16 @@ export default function VietQRTool() {
                 className="tool-input"
                 type="text"
                 inputMode="numeric"
-                placeholder="e.g. 100000"
-                value={amount}
-                onChange={(e) =>
-                  setAmount(e.target.value.replace(/\D/g, ""))
-                }
+                placeholder="e.g. 100,000"
+                value={formatCurrency(amount)}
+                onChange={handleAmountChange}
               />
               {/* Amount presets (VIETQR-09) */}
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {AMOUNT_PRESETS.map((p) => (
                   <button
                     key={p.value}
-                    onClick={() => setAmount(p.value)}
+                    onClick={() => handlePreset(p.value)}
                     className="btn-secondary text-xs px-2.5 py-1 rounded-full"
                   >
                     {p.label}
@@ -278,27 +371,39 @@ export default function VietQRTool() {
                 placeholder="e.g. Chuyen tien"
                 maxLength={25}
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={handleDescriptionChange}
               />
             </div>
+
+            {/* Generate button */}
+            <button
+              className="btn-primary w-full"
+              disabled={!isReady}
+              onClick={handleGenerateQR}
+            >
+              Generate QR
+            </button>
           </div>
         </div>
 
         {/* Right: QR display + download (VIETQR-05, 06) */}
         <div className="tool-card flex flex-col items-center justify-center gap-4 min-h-[280px]">
-          {isReady ? (
+          {generatedPayload ? (
             <>
-              <QRCodeSVG
-                value={payload}
-                size={220}
-                level="M"
-                bgColor="#ffffff"
-                fgColor="#000000"
-              />
+              {/* QR with padding so the code has breathing room */}
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeSVG
+                  value={generatedPayload}
+                  size={220}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
+              </div>
               {/* Hidden canvas for download */}
               <div ref={canvasRef} className="hidden">
                 <QRCodeCanvas
-                  value={payload}
+                  value={generatedPayload}
                   size={220}
                   level="M"
                   bgColor="#ffffff"
@@ -315,7 +420,9 @@ export default function VietQRTool() {
               style={{ width: 220, height: 220 }}
             >
               <p className="text-text-muted text-sm text-center px-4">
-                Fill in bank and account to generate QR
+                {isReady
+                  ? "Click Generate QR to create your code"
+                  : "Fill in bank and account to generate QR"}
               </p>
             </div>
           )}
@@ -333,11 +440,12 @@ export default function VietQRTool() {
                 const bank = BANKS.find((b) => b.bin === r.bin);
                 if (bank) setSelectedBank(bank);
                 setAccountNumber(r.accountNumber);
+                setGeneratedPayload(null);
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-surface-overlay text-left transition-colors"
             >
               <BankLogo code={r.code} size={24} />
-              <span className="text-sm text-text-primary">{r.shortName}</span>
+              <span className="text-sm text-text-primary font-medium">{r.shortName}</span>
               <span className="text-xs text-text-muted">{r.accountNumber}</span>
             </button>
           ))}
