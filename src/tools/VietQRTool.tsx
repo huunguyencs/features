@@ -519,13 +519,6 @@ export default function VietQRTool() {
                   />
                 </div>
 
-                {/* Bank logo — centered */}
-                <div className="flex items-center justify-center my-3">
-                  <div className="bg-white rounded-lg w-16 h-16 p-1.5 flex items-center justify-center shadow-sm border border-gray-100">
-                    <BankLogo code={selectedBank?.code ?? ""} size={56} />
-                  </div>
-                </div>
-
                 {/* Account holder name — only shown if provided */}
                 {holderName.trim() && (
                   <div className="w-full text-center text-sm mt-1">
