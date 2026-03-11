@@ -41,31 +41,6 @@ function BankLogo({ code, size = 28 }: { code: string; size?: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// NapasLogo — shows napas247 logo with fallback to styled text
-// ---------------------------------------------------------------------------
-
-function NapasLogo({ size = 32 }: { size?: number }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return (
-      <span className="text-teal-600 font-medium text-sm">
-        napas <strong>247</strong>
-      </span>
-    );
-  }
-  return (
-    <img
-      src="https://cdn.vietqr.io/img/NAPAS.png"
-      alt="napas247"
-      height={size}
-      className="object-contain"
-      style={{ height: size }}
-      onError={() => setFailed(true)}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
 // BankSelector — combobox with floating dropdown, collapses after selection
 // ---------------------------------------------------------------------------
 
@@ -326,22 +301,28 @@ export default function VietQRTool() {
     const qrCanvas = canvasRef.current?.querySelector("canvas");
     if (!qrCanvas) return;
 
-    const CANVAS_WIDTH = 320;
-    const padding = 16;
-    const qrDisplaySize = CANVAS_WIDTH - padding * 2; // 288px
-    const borderWidth = 3;
-    const logosRowHeight = 40;
+    // QR region: SIZE x SIZE with INNER_PAD on each side inside the border
+    const SIZE = 260;
+    const INNER_PAD = 12; // padding between border and QR image
+    const BORDER = 2;
+    // Total width = border*2 + inner_pad*2 + SIZE + outer margin*2
+    const OUTER_MARGIN = 16;
+    const CANVAS_WIDTH = OUTER_MARGIN + BORDER + INNER_PAD * 2 + SIZE + BORDER + OUTER_MARGIN;
+
     const lineHeight = 22;
     const smallLineHeight = 18;
+    const bankRowHeight = 32; // space for bank shortName text
+    const infoPad = 8;
 
     // Calculate total height
-    let totalHeight = padding + qrDisplaySize + padding; // QR section
-    totalHeight += logosRowHeight; // napas + bank logos row
-    totalHeight += padding / 2;
-    if (holderName.trim()) totalHeight += lineHeight;
-    totalHeight += lineHeight; // account number
-    totalHeight += smallLineHeight; // bank full name
-    totalHeight += padding;
+    let infoHeight = infoPad + bankRowHeight;
+    if (holderName.trim()) infoHeight += lineHeight;
+    infoHeight += lineHeight; // account number
+    infoHeight += smallLineHeight; // bank full name
+    infoHeight += OUTER_MARGIN;
+
+    const qrFrameHeight = BORDER + INNER_PAD + SIZE + INNER_PAD + BORDER;
+    const totalHeight = OUTER_MARGIN + qrFrameHeight + infoHeight;
 
     const out = document.createElement("canvas");
     out.width = CANVAS_WIDTH;
@@ -353,76 +334,57 @@ export default function VietQRTool() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CANVAS_WIDTH, totalHeight);
 
-    // Draw QR image scaled to fit
-    ctx.drawImage(qrCanvas, padding, padding, qrDisplaySize, qrDisplaySize);
-
-    // Blue border around QR
+    // Blue border rect around QR (drawn first, behind QR)
+    const frameX = OUTER_MARGIN;
+    const frameY = OUTER_MARGIN;
+    const frameW = BORDER + INNER_PAD * 2 + SIZE + BORDER;
+    const frameH = qrFrameHeight;
     ctx.strokeStyle = "#60a5fa"; // blue-400
-    ctx.lineWidth = borderWidth;
+    ctx.lineWidth = BORDER;
     ctx.strokeRect(
-      padding - borderWidth / 2,
-      padding - borderWidth / 2,
-      qrDisplaySize + borderWidth,
-      qrDisplaySize + borderWidth
+      frameX + BORDER / 2,
+      frameY + BORDER / 2,
+      frameW - BORDER,
+      frameH - BORDER
     );
 
-    let y = padding + qrDisplaySize + padding;
+    // Draw QR image inside the border with inner padding
+    const qrX = frameX + BORDER + INNER_PAD;
+    const qrY = frameY + BORDER + INNER_PAD;
+    ctx.drawImage(qrCanvas, qrX, qrY, SIZE, SIZE);
 
-    // Logos row — draw text representation (canvas cross-origin images are restricted)
-    ctx.textAlign = "center";
+    // Info section below the frame
     const centerX = CANVAS_WIDTH / 2;
+    ctx.textAlign = "center";
+    let y = OUTER_MARGIN + qrFrameHeight + infoPad;
 
-    // napas 247 on left
-    ctx.fillStyle = "#0d9488"; // teal-600
-    ctx.font = "bold 13px sans-serif";
-    ctx.fillText("napas 247", centerX - 60, y + logosRowHeight / 2 + 5);
-
-    // Vertical divider
-    ctx.strokeStyle = "#d1d5db"; // gray-300
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(centerX, y + 6);
-    ctx.lineTo(centerX, y + logosRowHeight - 6);
-    ctx.stroke();
-
-    // Bank shortName on right
+    // Bank shortName (text fallback for logo — cross-origin images are restricted)
     ctx.fillStyle = "#374151"; // gray-700
-    ctx.font = "bold 13px sans-serif";
-    ctx.fillText(selectedBank.shortName, centerX + 60, y + logosRowHeight / 2 + 5);
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText(selectedBank.shortName, centerX, y + bankRowHeight / 2 + 5);
+    y += bankRowHeight;
 
-    y += logosRowHeight + padding / 2;
-
-    // Holder name row (if provided)
+    // Holder name (if provided)
     if (holderName.trim()) {
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#6b7280"; // gray-500
-      ctx.font = "13px sans-serif";
-      ctx.fillText("Ten chu TK:", padding, y);
       ctx.fillStyle = "#0d9488"; // teal-600
-      ctx.font = "bold 13px sans-serif";
-      const labelWidth = ctx.measureText("Ten chu TK: ").width;
-      ctx.fillText(holderName.trim().toUpperCase(), padding + labelWidth, y);
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(holderName.trim().toUpperCase(), centerX, y);
       y += lineHeight;
     }
 
-    // Account number row
-    const displayAccount = showFullAccount
+    // Account number — centered, dark, no label
+    const displayAcc = showFullAccount
       ? accountNumber.trim()
       : maskAccount(accountNumber.trim());
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "13px sans-serif";
-    ctx.fillText("So TK:", padding, y);
     ctx.fillStyle = "#111827"; // gray-900
-    ctx.font = "bold 14px sans-serif";
-    const soTkWidth = ctx.measureText("So TK: ").width;
-    ctx.fillText(displayAccount, padding + soTkWidth, y);
+    ctx.font = "bold 16px sans-serif";
+    ctx.fillText(displayAcc, centerX, y);
     y += lineHeight;
 
-    // Bank full name
-    ctx.fillStyle = "#9ca3af"; // gray-400
-    ctx.font = "11px sans-serif";
-    ctx.fillText(selectedBank.name, padding, y);
+    // Bank full name — centered, small, muted
+    ctx.fillStyle = "#6b7280"; // gray-500
+    ctx.font = "12px sans-serif";
+    ctx.fillText(selectedBank.name, centerX, y);
 
     const url = out.toDataURL("image/png");
     const a = document.createElement("a");
@@ -567,27 +529,23 @@ export default function VietQRTool() {
                   />
                 </div>
 
-                {/* Logos row: napas247 | divider | bank logo */}
-                <div className="flex items-center justify-center gap-4 my-3">
-                  <NapasLogo size={28} />
-                  <div className="w-px h-8 bg-gray-300" />
+                {/* Bank logo — centered */}
+                <div className="flex items-center justify-center my-3">
                   <BankLogo code={selectedBank?.code ?? ""} size={32} />
                 </div>
 
                 {/* Account holder name — only shown if provided */}
                 {holderName.trim() && (
-                  <div className="w-full text-sm mt-1">
-                    <span className="text-gray-500">Ten chu TK: </span>
+                  <div className="w-full text-center text-sm mt-1">
                     <span className="text-teal-600 font-medium uppercase">
                       {holderName.trim()}
                     </span>
                   </div>
                 )}
 
-                {/* Account number row with toggle */}
-                <div className="w-full flex items-center gap-1 mt-1">
-                  <span className="text-sm text-gray-500">So TK: </span>
-                  <span className="text-base font-bold text-text-primary flex-1">
+                {/* Account number row with toggle — centered */}
+                <div className="w-full flex items-center justify-center gap-1 mt-1">
+                  <span className="text-base font-bold text-gray-900">
                     {displayAccount}
                   </span>
                   <button
@@ -631,8 +589,8 @@ export default function VietQRTool() {
                   </button>
                 </div>
 
-                {/* Bank full name */}
-                <div className="w-full text-xs text-gray-500 mt-1">
+                {/* Bank full name — centered */}
+                <div className="w-full text-center text-xs text-gray-500 mt-1">
                   {selectedBank?.name}
                 </div>
               </div>
