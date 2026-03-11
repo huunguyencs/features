@@ -204,6 +204,9 @@ interface RecentEntry {
   shortName: string;
   name: string;
   accountNumber: string;
+  holderName?: string;
+  amount?: string;
+  description?: string;
 }
 
 const RECENTS_KEY = "vietqr-recents";
@@ -297,96 +300,80 @@ export default function VietQRTool() {
   }
 
   function downloadPng() {
-    if (!generatedPayload || !selectedBank) return;
     const qrCanvas = canvasRef.current?.querySelector("canvas");
-    if (!qrCanvas) return;
+    if (!qrCanvas || !generatedPayload || !selectedBank) return;
 
-    // QR region: SIZE x SIZE with INNER_PAD on each side inside the border
-    const SIZE = 260;
-    const INNER_PAD = 12; // padding between border and QR image
-    const BORDER = 2;
-    // Total width = border*2 + inner_pad*2 + SIZE + outer margin*2
-    const OUTER_MARGIN = 16;
-    const CANVAS_WIDTH = OUTER_MARGIN + BORDER + INNER_PAD * 2 + SIZE + BORDER + OUTER_MARGIN;
+    const DPR = 2; // fixed 2x for crisp output on all devices
+    const LOGICAL_W = 320;
+    const QR_SIZE = 240;
+    const FRAME_PAD = 14;
+    const FRAME_BORDER = 2;
+    const TOTAL_QR_AREA = QR_SIZE + FRAME_PAD * 2 + FRAME_BORDER * 2;
+    const INFO_H = holderName ? 110 : 90; // space for info text below QR
+    const LOGICAL_H = TOTAL_QR_AREA + INFO_H + 24; // 24px bottom margin
 
-    const lineHeight = 22;
-    const smallLineHeight = 18;
-    const bankRowHeight = 32; // space for bank shortName text
-    const infoPad = 8;
-
-    // Calculate total height
-    let infoHeight = infoPad + bankRowHeight;
-    if (holderName.trim()) infoHeight += lineHeight;
-    infoHeight += lineHeight; // account number
-    infoHeight += smallLineHeight; // bank full name
-    infoHeight += OUTER_MARGIN;
-
-    const qrFrameHeight = BORDER + INNER_PAD + SIZE + INNER_PAD + BORDER;
-    const totalHeight = OUTER_MARGIN + qrFrameHeight + infoHeight;
-
-    const out = document.createElement("canvas");
-    out.width = CANVAS_WIDTH;
-    out.height = totalHeight;
-    const ctx = out.getContext("2d");
-    if (!ctx) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = LOGICAL_W * DPR;
+    canvas.height = LOGICAL_H * DPR;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(DPR, DPR);
 
     // White background
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, CANVAS_WIDTH, totalHeight);
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
 
-    // Blue border rect around QR (drawn first, behind QR)
-    const frameX = OUTER_MARGIN;
-    const frameY = OUTER_MARGIN;
-    const frameW = BORDER + INNER_PAD * 2 + SIZE + BORDER;
-    const frameH = qrFrameHeight;
+    // Blue border frame
     ctx.strokeStyle = "#60a5fa"; // blue-400
-    ctx.lineWidth = BORDER;
-    ctx.strokeRect(
-      frameX + BORDER / 2,
-      frameY + BORDER / 2,
-      frameW - BORDER,
-      frameH - BORDER
+    ctx.lineWidth = FRAME_BORDER;
+    const frameX = (LOGICAL_W - TOTAL_QR_AREA) / 2;
+    const frameY = 16;
+    ctx.strokeRect(frameX, frameY, TOTAL_QR_AREA, TOTAL_QR_AREA);
+
+    // QR image inside frame
+    ctx.drawImage(
+      qrCanvas,
+      frameX + FRAME_BORDER + FRAME_PAD,
+      frameY + FRAME_BORDER + FRAME_PAD,
+      QR_SIZE,
+      QR_SIZE
     );
 
-    // Draw QR image inside the border with inner padding
-    const qrX = frameX + BORDER + INNER_PAD;
-    const qrY = frameY + BORDER + INNER_PAD;
-    ctx.drawImage(qrCanvas, qrX, qrY, SIZE, SIZE);
-
-    // Info section below the frame
-    const centerX = CANVAS_WIDTH / 2;
+    // Info text below frame
+    const cx = LOGICAL_W / 2;
+    let y = frameY + TOTAL_QR_AREA + 20;
     ctx.textAlign = "center";
-    let y = OUTER_MARGIN + qrFrameHeight + infoPad;
+    ctx.textBaseline = "top";
 
-    // Bank shortName (text fallback for logo — cross-origin images are restricted)
-    ctx.fillStyle = "#374151"; // gray-700
-    ctx.font = "bold 14px sans-serif";
-    ctx.fillText(selectedBank.shortName, centerX, y + bankRowHeight / 2 + 5);
-    y += bankRowHeight;
+    // Bank short name (since logo can't draw cross-origin)
+    ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = "#111827";
+    ctx.fillText(selectedBank.shortName, cx, y);
+    y += 22;
 
-    // Holder name (if provided)
+    // Holder name (if set)
     if (holderName.trim()) {
-      ctx.fillStyle = "#0d9488"; // teal-600
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(holderName.trim().toUpperCase(), centerX, y);
-      y += lineHeight;
+      ctx.font = "bold 14px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillStyle = "#0f766e"; // teal-700
+      ctx.fillText(holderName.toUpperCase(), cx, y);
+      y += 22;
     }
 
-    // Account number — centered, dark, no label
+    // Account number
     const displayAcc = showFullAccount
-      ? accountNumber.trim()
-      : maskAccount(accountNumber.trim());
-    ctx.fillStyle = "#111827"; // gray-900
-    ctx.font = "bold 16px sans-serif";
-    ctx.fillText(displayAcc, centerX, y);
-    y += lineHeight;
+      ? accountNumber
+      : maskAccount(accountNumber);
+    ctx.font = "bold 16px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = "#111827";
+    ctx.fillText(displayAcc, cx, y);
+    y += 24;
 
-    // Bank full name — centered, small, muted
-    ctx.fillStyle = "#6b7280"; // gray-500
-    ctx.font = "12px sans-serif";
-    ctx.fillText(selectedBank.name, centerX, y);
+    // Bank full name
+    ctx.font = "12px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = "#6b7280";
+    ctx.fillText(selectedBank.name, cx, y);
 
-    const url = out.toDataURL("image/png");
+    // Download
+    const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
     a.download = "vietqr.png";
@@ -399,6 +386,9 @@ export default function VietQRTool() {
       shortName: selectedBank.shortName,
       name: selectedBank.name,
       accountNumber: accountNumber.trim(),
+      holderName: holderName.trim() || undefined,
+      amount: amount.trim() || undefined,
+      description: description.trim() || undefined,
     };
     setRecents((prev) => saveRecent(entry, prev));
   }
@@ -531,7 +521,9 @@ export default function VietQRTool() {
 
                 {/* Bank logo — centered */}
                 <div className="flex items-center justify-center my-3">
-                  <BankLogo code={selectedBank?.code ?? ""} size={32} />
+                  <div className="bg-white rounded-lg w-16 h-16 p-1.5 flex items-center justify-center shadow-sm border border-gray-100">
+                    <BankLogo code={selectedBank?.code ?? ""} size={56} />
+                  </div>
                 </div>
 
                 {/* Account holder name — only shown if provided */}
@@ -599,7 +591,7 @@ export default function VietQRTool() {
               <div ref={canvasRef} className="hidden">
                 <QRCodeCanvas
                   value={generatedPayload}
-                  size={288}
+                  size={240}
                   level="M"
                   bgColor="#ffffff"
                   fgColor="#000000"
@@ -633,9 +625,20 @@ export default function VietQRTool() {
               key={i}
               onClick={() => {
                 const bank = BANKS.find((b) => b.bin === r.bin);
-                if (bank) setSelectedBank(bank);
+                if (!bank) return;
+                setSelectedBank(bank);
                 setAccountNumber(r.accountNumber);
-                setGeneratedPayload(null);
+                setHolderName(r.holderName ?? "");
+                if (r.amount) setAmount(r.amount);
+                if (r.description) setDescription(r.description);
+                // Auto-generate immediately using entry values directly (avoids async state)
+                const payload = buildVietQRPayload({
+                  bin: r.bin,
+                  accountNumber: r.accountNumber,
+                  amount: r.amount ?? "",
+                  description: r.description ?? "",
+                });
+                setGeneratedPayload(payload);
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md hover:bg-surface-overlay text-left transition-colors"
             >
